@@ -2,6 +2,6 @@
   "name": "TCS3414",
   "author": "Johann Scholtz <johann.g.scholtz@gmail.com>",
   "license": "MIT",
-  "version": "0.0.10",
+  "version": "0.0.2",
   "description": "TCS3414 digital light sensor library for Spark Core."
 }
