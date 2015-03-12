@@ -115,7 +115,8 @@ uint8_t TCS3414::read8(uint8_t registerAddress)
     Wire.write(0x80 | registerAddress);
     Wire.endTransmission();
 
-    Wire.requestFrom(_address, 1);
+    uint8_t length = sizeof(uint8_t);
+    Wire.requestFrom(_address, length);
     return Wire.read();
 }
 
@@ -127,7 +128,8 @@ uint16_t TCS3414::read16(uint8_t registerAddress)
     Wire.write(0x80 | registerAddress);
     Wire.endTransmission();
 
-    Wire.requestFrom(_address, 2);
+    uint8_t length = sizeof(uint16_t);
+    Wire.requestFrom(_address, length);
     t = Wire.read();
     x = Wire.read();
     x <<= 8;
