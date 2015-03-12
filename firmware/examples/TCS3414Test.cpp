@@ -1,4 +1,4 @@
-#include "TCS3414.h"
+#include "TCS3414/TCS3414.h"
 
 // Connection for TCS3414 sensor to Spark Care
 // Connect sensor GND to Core GND
