@@ -46,22 +46,22 @@ enum
     TCS3414_REGISTER_CLEAR_HIGH_BYTE,
 };
 
-enum
+typedef enum
 {
     TCS3414_INTEGRATIONTIME_12MS = 0x0,
     TCS3414_INTEGRATIONTIME_100MS,
     TCS3414_INTEGRATIONTIME_400MS,
-};
+} TCS3414_INTEGRATIONTIME;
 
-enum
+typedef enum
 {
     TCS3414_GAIN_1X = 0x0,
     TCS3414_GAIN_4X,
     TCS3414_GAIN_16X,
     TCS3414_GAIN_64X,
-};
+} TCS3414_GAIN;
 
-enum
+typedef enum
 {
     TCS3414_PRESCALARMODE_DIVIDE_BY_1 = 0x0,
     TCS3414_PRESCALARMODE_DIVIDE_BY_2,
@@ -70,7 +70,7 @@ enum
     TCS3414_PRESCALARMODE_DIVIDE_BY_16,
     TCS3414_PRESCALARMODE_DIVIDE_BY_32,
     TCS3414_PRESCALARMODE_DIVIDE_BY_64,
-};
+} TCS3414_PRESCALARMODE;
 
 // This class provides implementation for a TCS3414 digital color sensor connected
 // to a Spark Core WiFi development kit. This implementation uses the I2C bus to
@@ -80,6 +80,7 @@ class TCS3414
 public:
     TCS3414(uint8_t address = 0x39) :
       _address(address),
+      _countsPerLux(0),
       _enableCount(0)
     {
     }
@@ -87,15 +88,18 @@ public:
     boolean begin();
     uint8_t getPartNumber() const;
     uint8_t getRevisionNumber() const;
-    void setIntegrationTime(uint8_t integrationTime);
-    void setGain(uint8_t gain, uint8_t prescaler);
-    void getData(uint16_t *red, uint16_t *green, uint16_t *blue, uint16_t *clear);
+    void setIntegrationTime(TCS3414_INTEGRATIONTIME integrationTime);
+    void setGain(TCS3414_GAIN gain, TCS3414_PRESCALARMODE prescaler = TCS3414_PRESCALARMODE_DIVIDE_BY_1);
+    void getRawData(uint16_t *red, uint16_t *green, uint16_t *blue, uint16_t *clear);
+    uint32_t getLux();
 
 private:
     uint8_t _address;
     uint8_t _partNumber;
     uint8_t _revisionNumber;
-    uint8_t _integrationTime;
+    TCS3414_INTEGRATIONTIME _integrationTime;
+    TCS3414_GAIN _gain;
+    uint32_t _countsPerLux;
     uint8_t _enableCount;
 
     void getInformation(uint8_t *partNumber, uint8_t *revisionNumber);
@@ -104,8 +108,12 @@ private:
     void write8(uint8_t registerAddress, uint8_t value);
     uint8_t read8(uint8_t registerAddress);
     uint16_t read16(uint8_t registerAddress);
-    void waitForIntegrationTime();
-    void getData(uint8_t registerAddress, uint16_t *data);
+
+    uint8_t getIntegrationTimeInMilliseconds() const;
+    uint8_t getGainMultiplier() const;
+    void getRawData(uint8_t registerAddress, uint16_t *data);
+    uint32_t calculateCountsPerLux();
+    uint32_t calculateLux(int32_t red, int32_t green, int32_t blue, int32_t clear);
 
     class AutoEnable
     {

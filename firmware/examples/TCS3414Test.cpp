@@ -29,17 +29,9 @@ void setup()
 
 void loop()
 {
-    uint16_t red, green, blue, clear;
-    sensor.getData(&red, &green, &blue, &clear);
-
-    Serial.print("Red: ");
-    Serial.println(red);
-    Serial.print("Green: ");
-    Serial.println(green);
-    Serial.print("Blue: ");
-    Serial.println(blue);
-    Serial.print("Clear: ");
-    Serial.println(clear);
+    uint32_t lux = sensor.getLux();
+    Serial.print("Lux: ");
+    Serial.println(lux);
 
     delay(1000);
 }

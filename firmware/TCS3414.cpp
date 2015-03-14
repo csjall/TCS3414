@@ -49,27 +49,37 @@ uint8_t TCS3414::getRevisionNumber() const
     return _revisionNumber;
 }
 
-void TCS3414::setIntegrationTime(uint8_t integrationTime)
+void TCS3414::setIntegrationTime(TCS3414_INTEGRATIONTIME integrationTime)
 {
     AutoEnable autoEnable(this);
     write8(TCS3414_REGISTER_TIMING, integrationTime);
     _integrationTime = integrationTime;
+    _countsPerLux = calculateCountsPerLux();
 }
 
-void TCS3414::setGain(uint8_t gain, uint8_t prescaler)
+void TCS3414::setGain(TCS3414_GAIN gain, TCS3414_PRESCALARMODE prescaler)
 {
     AutoEnable autoEnable(this);
     write8(TCS3414_REGISTER_GAIN, (gain << 4) | prescaler);
+    _gain = gain;
+    _countsPerLux = calculateCountsPerLux();
 }
 
-void TCS3414::getData(uint16_t *red, uint16_t *green, uint16_t *blue, uint16_t *clear)
+void TCS3414::getRawData(uint16_t *red, uint16_t *green, uint16_t *blue, uint16_t *clear)
 {
     AutoEnable autoEnable(this);
-    waitForIntegrationTime();
-    getData(TCS3414_REGISTER_GREEN_LOW_BYTE, green);
-    getData(TCS3414_REGISTER_RED_LOW_BYTE, red);
-    getData(TCS3414_REGISTER_BLUE_LOW_BYTE, blue);
-    getData(TCS3414_REGISTER_CLEAR_LOW_BYTE, clear);
+    delay(getIntegrationTimeInMilliseconds() + 2); // Wait a bit longer for integration to complete.
+    getRawData(TCS3414_REGISTER_GREEN_LOW_BYTE, green);
+    getRawData(TCS3414_REGISTER_RED_LOW_BYTE, red);
+    getRawData(TCS3414_REGISTER_BLUE_LOW_BYTE, blue);
+    getRawData(TCS3414_REGISTER_CLEAR_LOW_BYTE, clear);
+}
+
+uint32_t TCS3414::getLux()
+{
+    uint16_t red, green, blue, clear;
+    getRawData(&red, &green, &blue, &clear);
+    return calculateLux(red, green, blue, clear);
 }
 
 void TCS3414::getInformation(uint8_t *partNumber, uint8_t *revisionNumber)
@@ -137,31 +147,75 @@ uint16_t TCS3414::read16(uint8_t registerAddress)
     return x;
 }
 
-void TCS3414::waitForIntegrationTime()
+uint8_t TCS3414::getIntegrationTimeInMilliseconds() const
 {
-    // Wait for the integration time last specified in setIntegrationTime.
-    if (_integrationTime == TCS3414_INTEGRATIONTIME_12MS)
+    uint8_t table[] =
     {
-        delay(14);
-    }
-    else if (_integrationTime == TCS3414_INTEGRATIONTIME_100MS)
-    {
-        delay(102);
-    }
-    else if (_integrationTime == TCS3414_INTEGRATIONTIME_400MS)
-    {
-        delay(403);
-    }
-    else
-    {
-        while (1);
-    }
+        12, // TCS3414_INTEGRATIONTIME_12MS
+        100, // TCS3414_INTEGRATIONTIME_100MS
+        400, // TCS3414_INTEGRATIONTIME_400MS
+    };
+    return table[_integrationTime];
 }
 
-void TCS3414::getData(uint8_t registerAddress, uint16_t *data)
+uint8_t TCS3414::getGainMultiplier() const
+{
+    uint8_t table[] =
+    {
+        1, // TCS3414_GAIN_1X
+        4, // TCS3414_GAIN_4X
+        16, // TCS3414_GAIN_16X
+        64, // TCS3414_GAIN_64X
+    };
+    return table[_gain];
+}
+
+void TCS3414::getRawData(uint8_t registerAddress, uint16_t *data)
 {
     if (data)
     {
         *data = read16(registerAddress | 0x20); // Query 16-bits from the specified register address.
     }
+}
+
+uint32_t TCS3414::calculateCountsPerLux()
+{
+    const uint32_t deviceGlassFactor = 127;
+
+    uint32_t integrationTime = getIntegrationTimeInMilliseconds();
+    uint32_t gain = getGainMultiplier();
+
+    // Convert milliseconds to microseconds
+    integrationTime = integrationTime * 1000;
+
+    // CPL = (ATIME_us * AGAINx) / DGF
+    uint32_t cpl = (integrationTime * gain) / deviceGlassFactor;
+    return cpl;
+}
+
+uint32_t TCS3414::calculateLux(int32_t red, int32_t green, int32_t blue, int32_t clear)
+{
+    const int32_t redCoefficient = -97;
+    const int32_t greenCoefficient = 1000;
+    const int32_t blueCoefficient = -482;
+
+    // IR = (R+G+B-C) >> 1
+    int32_t infrared = (red + green + blue - clear) >> 1;
+
+    // R’ = R – IR
+    // G' = G - IR
+    // B' = B - IR
+    red = red - infrared;
+    green = green - infrared;
+    blue = blue - infrared;
+
+    // Gi”= R_Coef * R’ + G_Coef * G’ + B_Coef * B’
+    int32_t g = red * redCoefficient + green * greenCoefficient + blue * blueCoefficient;
+
+    int32_t cpl = _countsPerLux;
+
+    // Lux = Gi” / CPL
+    int32_t lux = g / cpl;
+    lux = max(lux, 0);
+    return lux;
 }
